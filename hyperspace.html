@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyperspace Warp Drive 2.0</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body id="warpBody">
+    <canvas id="warpCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('warpCanvas');
+        const body = document.getElementById('warpBody');
+        const ctx = canvas.getContext('2d');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        // Constants
+        const STAR_COUNT = 1200; // Increased density
+        const STAR_MAX_Z = 1500; // Increased depth
+        
+        let stars = [];
+
+        // Central vanishing point
+        let center_x = width / 2;
+        let center_y = height / 2;
+
+        // State variables
+        let time = 0;
+        let speedMultiplier = 1.0;
+
+        // Star object definition
+        class Star {
+            constructor() {
+                // Initial position in 3D space
+                this.x = (Math.random() - 0.5) * 300;
+                this.y = (Math.random() - 0.5) * 300;
+                this.z = Math.random() * STAR_MAX_Z + 1;
+                
+                // Base speed factor
+                this.baseSpeed = Math.random() * 0.015 + 0.005;
+                
+                // Visual properties
+                this.baseSize = Math.random() * 1.2 + 0.3;
+                // Use a slightly warmer, more complex color
+                this.initialColor = { 
+                    r: Math.random() * 50 + 150, 
+                    g: Math.random() * 100 + 150, 
+                    b: Math.random() * 200 + 200,
+                    alpha: Math.random() * 0.6 + 0.2
+                };
+            }
+
+            update() {
+                // Apply dynamic speed based on state
+                const currentSpeed = this.baseSpeed * (1 + speedMultiplier * 5);
+                
+                // Move forward (z decreases)
+                this.z -= currentSpeed; 
+                
+                // If star is too far away, respawn it near the center
+                if (this.z < 1) {
+                    this.reset();
+                }
+
+                // Calculate screen coordinates (perspective projection)
+                // Normalized projection factor (higher Z means smaller apparent size)
+                const projectionScale = 1500 / this.z; 
+                
+                // Project to screen center
+                const screenX = center_x + (this.x * projectionScale);
+                const screenY = center_y + (this.y * projectionScale);
+                
+                return { screenX, screenY, projectionScale };
+            }
+
+            reset() {
+                // Respawn star far away
+                this.x = (Math.random() - 0.5) * 400;
+                this.y = (Math.random() - 0.5) * 400;
+                this.z = STAR_MAX_Z;
+                this.baseSpeed = Math.random() * 0.015 + 0.005;
+            }
+
+            // Draw method using motion streaks
+            draw(sx, sy, scale) {
+                // Streak length proportional to speed and scale
+                const streakLength = Math.max(1, this.baseSize * 4 * scale);
+                
+                // Calculate the starting point (slightly behind the current position)
+                const startX = sx - (this.x * scale * 0.5);
+                const startY = sy - (this.y * scale * 0.5);
+
+                // Calculate dynamic color based on Z (closer = brighter)
+                const intensity = Math.min(1.0, scale / 20);
+                const colorR = Math.min(255, this.initialColor.r + intensity * 50);
+                const colorG = Math.min(255, this.initialColor.g + intensity * 50);
+                const colorB = Math.min(255, this.initialColor.b + intensity * 50);
+
+                ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${this.initialColor.alpha * intensity})`;
+                ctx.lineWidth = this.baseSize * 0.5 * intensity;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(sx, sy);
+                ctx.stroke();
+            }
+        }
+
+        // Initialize stars
+        function initStars() {
+            for (let i = 0; i < STAR_COUNT; i++) {
+                stars.push(new Star());
+            }
+        }
+
+        let lastTime = 0;
+
+        // Animation loop
+        function animate(currentTime) {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Dynamic acceleration and speed boost
+            // Gradually increase speed up to a maximum
+            speedMultiplier = Math.min(5.0, speedMultiplier + 0.0001 * deltaTime);
+            
+            // Subtle camera shake proportional to speed
+            const shakeMagnitude = 0.5 * (speedMultiplier / 5.0);
+            const shakeX = Math.sin(currentTime * 0.001) * shakeMagnitude;
+            const shakeY = Math.cos(currentTime * 0.0015) * shakeMagnitude;
+            
+            // Apply shake to the canvas drawing context
+            ctx.translate(shakeX, shakeY);
+
+            // Clear canvas with a stronger fade effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; // Less fade, more trail
+            ctx.fillRect(0, 0, width, height);
+
+            // Set additive blending for glowing effect (crucial for warp)
+            ctx.globalCompositeOperation = "lighter";
+
+            for (let star of stars) {
+                // Update position and get projected coordinates
+                const { screenX, screenY, projectionScale } = star.update();
+                
+                // Draw the streak
+                star.draw(screenX, screenY, projectionScale);
+            }
+
+            // Reset translation for next frame
+            ctx.setTransform(1, 0, 0, 1, 0, 0); 
+
+            // Request next frame
+            requestAnimationFrame(animate);
+        }
+
+        // Handle window resize
+        function handleResize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            // Re-center coordinates after resize
+            center_x = width / 2;
+            center_y = height / 2;
+        }
+
+        // Start everything
+        window.addEventListener('resize', handleResize);
+        initStars();
+        handleResize(); // Initial call
+        animate(0);
+
+    </script>
+</body
+</html>
